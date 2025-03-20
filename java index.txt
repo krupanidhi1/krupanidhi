@@ -1,0 +1,281 @@
+const loginPage = document.getElementById('loginPage');
+const signupPage = document.getElementById('signupPage');
+const appContainer = document.getElementById('appContainer');
+const loginForm = document.getElementById('loginForm');
+const signupForm = document.getElementById('signupForm');
+const showSignup = document.getElementById('showSignup');
+const showLogin = document.getElementById('showLogin');
+const logoutBtn = document.getElementById('logoutBtn');
+const userName = document.getElementById('userName');
+const userAvatar = document.getElementById('userAvatar');
+const signupTermsCheckbox = document.getElementById('signupTermsCheckbox');
+
+showSignup.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginPage.style.display = 'none';
+    signupPage.style.display = 'block';
+});
+
+showLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    signupPage.style.display = 'none';
+    loginPage.style.display = 'block';
+});
+
+signupForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('signupEmail').value;
+    const password = document.getElementById('signupPassword').value;
+    
+    if (!signupTermsCheckbox.checked) {
+        alert('Please agree to the terms and conditions');
+        return;
+    }
+
+    if (name && email && password) {
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userName', name);
+        showApp();
+    }
+});
+
+loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+
+    if (email && password) {
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userName', email.split('@')[0]);
+        showApp();
+    }
+});
+
+logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userName');
+    loginPage.style.display = 'none';
+    signupPage.style.display = 'block';
+    appContainer.style.display = 'none';
+});
+
+function showApp() {
+    loginPage.style.display = 'none';
+    signupPage.style.display = 'none';
+    appContainer.style.display = 'block';
+    const name = localStorage.getItem('userName');
+    userName.textContent = name;
+    userAvatar.textContent = name.charAt(0).toUpperCase();
+}
+
+if (localStorage.getItem('userEmail')) {
+    showApp();
+}
+
+const canvas = document.getElementById('drawingCanvas');
+const ctx = canvas.getContext('2d');
+const colorPicker = document.getElementById('colorPicker');
+const brushSize = document.getElementById('brushSize');
+const clearBtn = document.getElementById('clearBtn');
+const saveBtn = document.getElementById('saveBtn');
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const resetBtn = document.getElementById('resetBtn');
+const textEditor = document.getElementById('textEditor');
+const clearTextBtn = document.getElementById('clearTextBtn');
+const saveTextBtn = document.getElementById('saveTextBtn');
+const savePdfBtn = document.getElementById('savePdfBtn');
+const characterCount = document.getElementById('characterCount');
+const MAX_CHARS = 500;
+
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+let drawingHistory = [];
+let currentStep = 0;
+let isPlaying = false;
+let animationInterval;
+
+function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = colorPicker.value;
+    ctx.lineWidth = brushSize.value;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+}
+
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function getCoordinates(e) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    let x, y;
+    if (e.type.includes('touch')) {
+        x = (e.touches[0].clientX - rect.left) * (canvas.width / (rect.width * dpr));
+        y = (e.touches[0].clientY - rect.top) * (canvas.height / (rect.height * dpr));
+    } else {
+        x = (e.clientX - rect.left) * (canvas.width / (rect.width * dpr));
+        y = (e.clientY - rect.top) * (canvas.height / (rect.height * dpr));
+    }
+    return { x, y };
+}
+
+function startDrawing(e) {
+    isDrawing = true;
+    const coords = getCoordinates(e);
+    [lastX, lastY] = [coords.x, coords.y];
+    drawingHistory.push([]);
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const coords = getCoordinates(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(coords.x, coords.y);
+    ctx.stroke();
+    drawingHistory[drawingHistory.length - 1].push({
+        x: coords.x,
+        y: coords.y,
+        color: colorPicker.value,
+        size: brushSize.value
+    });
+    [lastX, lastY] = [coords.x, coords.y];
+}
+
+function stopDrawing() {
+    isDrawing = false;
+}
+
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mouseout', stopDrawing);
+canvas.addEventListener('touchstart', startDrawing, { passive: false });
+canvas.addEventListener('touchmove', draw, { passive: false });
+canvas.addEventListener('touchend', stopDrawing);
+
+colorPicker.addEventListener('input', (e) => {
+    ctx.strokeStyle = e.target.value;
+});
+
+brushSize.addEventListener('input', (e) => {
+    ctx.lineWidth = e.target.value;
+});
+
+clearBtn.addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawingHistory = [];
+    currentStep = 0;
+});
+
+saveBtn.addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = 'drawing.png';
+    link.href = canvas.toDataURL();
+    link.click();
+});
+
+function playAnimation() {
+    if (isPlaying) return;
+    isPlaying = true;
+    currentStep = 0;
+    animationInterval = setInterval(() => {
+        if (currentStep >= drawingHistory.length) {
+            clearInterval(animationInterval);
+            isPlaying = false;
+            return;
+        }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let i = 0; i <= currentStep; i++) {
+            const stroke = drawingHistory[i];
+            if (stroke) {
+                ctx.strokeStyle = stroke[0].color;
+                ctx.lineWidth = stroke[0].size;
+                ctx.beginPath();
+                ctx.moveTo(stroke[0].x, stroke[0].y);
+                for (let j = 1; j < stroke.length; j++) {
+                    ctx.lineTo(stroke[j].x, stroke[j].y);
+                }
+                ctx.stroke();
+            }
+        }
+        currentStep++;
+    }, 50);
+}
+
+function pauseAnimation() {
+    clearInterval(animationInterval);
+    isPlaying = false;
+}
+
+function resetAnimation() {
+    clearInterval(animationInterval);
+    isPlaying = false;
+    currentStep = 0;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+playBtn.addEventListener('click', playAnimation);
+pauseBtn.addEventListener('click', pauseAnimation);
+resetBtn.addEventListener('click', resetAnimation);
+
+function updateCharacterCount() {
+    const count = textEditor.value.length;
+    characterCount.textContent = `Characters: ${count}/${MAX_CHARS}`;
+    if (count > MAX_CHARS) {
+        characterCount.classList.add('error');
+        textEditor.value = textEditor.value.substring(0, MAX_CHARS);
+    } else if (count > MAX_CHARS * 0.8) {
+        characterCount.classList.remove('error');
+        characterCount.classList.add('warning');
+    } else {
+        characterCount.classList.remove('error', 'warning');
+    }
+    saveTextBtn.disabled = count === 0;
+    savePdfBtn.disabled = count === 0;
+}
+
+textEditor.addEventListener('input', updateCharacterCount);
+textEditor.addEventListener('keydown', (e) => {
+    if (textEditor.value.length >= MAX_CHARS && e.key !== 'Backspace' && e.key !== 'Delete') {
+        e.preventDefault();
+    }
+});
+
+clearTextBtn.addEventListener('click', () => {
+    textEditor.value = '';
+    updateCharacterCount();
+});
+
+saveTextBtn.addEventListener('click', () => {
+    const text = textEditor.value;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'notes.txt';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+});
+
+savePdfBtn.addEventListener('click', () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    const text = textEditor.value;
+    const splitText = doc.splitTextToSize(text, 180);
+    doc.setFontSize(12);
+    doc.text(splitText, 15, 15);
+    doc.save('notes.pdf');
+});
+
+updateCharacterCount();
